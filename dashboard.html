@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hello | Admin Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#080e1a;--panel:#111c2d;--border:#263750;--blue:#64caff;--muted:#91a4bd;--green:#35d39a;--red:#ff7777}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:white;font-family:Arial,sans-serif}
+button{cursor:pointer;font-family:inherit}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:245px;background:#0d1727;border-left:1px solid var(--border);padding:25px 16px;flex-shrink:0}
+.logo{font-size:28px;font-weight:bold;color:var(--blue);padding:8px 12px 30px}
+.logo span{color:white}
+.menu-title{color:#657c98;font-size:12px;padding:15px 12px 8px}
+.nav{display:block;width:100%;padding:13px 12px;margin:5px 0;color:#aebed2;background:transparent;border:0;border-radius:10px;text-align:right;font-size:15px}
+.nav:hover,.nav.active{background:#1b3049;color:var(--blue)}
+.main{flex:1;min-width:0;padding:28px}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:22px}
+.topbar h1{font-size:24px;margin:0}
+.status{color:var(--green);font-size:13px}
+.container{max-width:1250px;margin:auto}
+.subtitle{color:var(--muted);line-height:1.8}
+.section{margin-top:30px}
+.section h2{font-size:19px;margin-bottom:17px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin-top:25px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:15px;padding:21px;min-width:0}
+.card h3{color:var(--muted);font-size:14px;font-weight:normal;margin:0 0 15px}
+.number{font-size:29px;font-weight:bold;color:var(--blue)}
+.small{font-size:12px;color:var(--muted);margin-top:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:17px}
+.action{background:var(--blue);color:#061321;border:0;border-radius:9px;padding:11px 17px;font-weight:bold}
+.action.secondary{background:#263b55;color:white}
+.action.danger{background:#b83c4b;color:white}
+.action:disabled{opacity:.5;cursor:not-allowed}
+.page{display:none}
+.page.active{display:block}
+.table-wrap{overflow-x:auto;width:100%}
+table{width:100%;border-collapse:collapse;margin-top:12px;min-width:500px}
+th,td{text-align:right;padding:14px 9px;border-bottom:1px solid var(--border)}
+th{color:var(--muted);font-size:13px}
+td{font-size:14px}
+.tag{display:inline-block;padding:6px 10px;border-radius:20px;background:#193c37;color:var(--green);font-size:12px}
+.notice{border:1px solid #3a506b;background:#14243a;padding:15px;border-radius:12px;color:#c3d4e8;line-height:1.8}
+.log{padding:13px 0;border-bottom:1px solid var(--border);color:#bdcce0}
+.login-input{width:100%;padding:14px;margin:10px 0;border-radius:8px;border:1px solid var(--border);background:#080e1a;color:white;font-size:15px}
+.photo-grid,.video-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:15px;margin-top:20px}
+.photo-item,.video-item{background:#0d1727;border:1px solid var(--border);border-radius:12px;padding:10px;overflow:hidden}
+.photo-item img{width:100%;height:170px;object-fit:cover;border-radius:8px;display:block;background:#17243a}
+.video-item video{width:100%;max-height:220px;background:#050a12;border-radius:8px}
+.photo-item p,.video-item p{font-size:12px;color:var(--muted);overflow-wrap:anywhere;line-height:1.6}
+.photo-item a,.video-item a{color:var(--blue);font-size:13px}
+.empty{color:var(--muted);padding:20px;text-align:center}
+.live-video{width:100%;max-height:65vh;background:#02060c;border-radius:12px;display:block}
+.live-status{color:var(--green);margin:12px 0}
+footer{text-align:center;color:#627791;margin-top:50px;font-size:12px}
+@media(max-width:750px){.layout{display:block}.sidebar{width:100%;border-left:0;border-bottom:1px solid var(--border)}.logo{padding-bottom:12px}.main{padding:18px}.nav{display:inline-block;width:auto;margin:3px}}
+</style>
+</head>
+<body>
+
+<div id="loginScreen" style="display:flex;min-height:100vh;align-items:center;justify-content:center;background:#080e1a;padding:20px">
+<div style="background:#111d2e;border:1px solid #233b55;padding:30px;border-radius:16px;width:100%;max-width:400px;text-align:center">
+<h2 style="color:#64caff">Hello Admin</h2>
+<p>تسجيل دخول الأدمن</p>
+<input id="adminEmail" class="login-input" type="email" placeholder="البريد الإلكتروني">
+<input id="adminPassword" class="login-input" type="password" placeholder="كلمة المرور">
+<button class="action" style="width:100%;padding:14px" onclick="adminLogin()" id="loginButton">تسجيل الدخول</button>
+<p id="loginMessage" style="color:#ff7777"></p>
+</div>
+</div>
+
+<div class="layout" id="adminDashboard" style="display:none">
+<aside class="sidebar">
+<div class="logo">Hello<span>.</span></div>
+<div class="menu-title">القائمة الرئيسية</div>
+<button class="nav active" onclick="showPage('overview',this)">▦ الرئيسية</button>
+<button class="nav" onclick="showPage('sessions',this)">◉ الجلسات</button>
+<button class="nav" onclick="showPage('live',this)">🔴 البث المباشر</button>
+<button class="nav" onclick="showPage('photos',this)">📷 الصور</button>
+<button class="nav" onclick="showPage('contacts',this)">☎️ أرقام الهاتف</button>
+<button class="nav" onclick="showPage('videos',this)">🎥 الفيديوهات</button>
+<button class="nav" onclick="showPage('users',this)">♙ المستخدمون</button>
+<button class="nav" onclick="showPage('activity',this)">◷ سجل النشاطات</button>
+<div class="menu-title">النظام</div>
+<button class="nav" onclick="showPage('settings',this)">⚙️ الإعدادات</button>
+<button class="nav" onclick="adminLogout()">↩ تسجيل الخروج</button>
+</aside>
+
+<main class="main">
+<div class="container">
+<header class="topbar">
+<div>
+<h1 id="pageTitle">لوحة التحكم</h1>
+<p class="subtitle">إدارة ومتابعة نظام Hello</p>
+</div>
+<div class="status" id="connectionStatus">● جاري فحص الاتصال</div>
+</header>
+
+<section class="page active" id="overview">
+<div class="stats">
+<div class="card"><h3>الجلسات المسجلة</h3><div class="number" id="activeSessions">0</div></div>
+<div class="card"><h3>الصور المشاركة</h3><div class="number" id="photoCount">0</div></div>
+<div class="card"><h3>جهات الاتصال المشاركة</h3><div class="number" id="contactCount">0</div></div>
+<div class="card"><h3>الفيديوهات المحفوظة</h3><div class="number" id="videoCount">0</div></div>
+<div class="card"><h3>حالة قاعدة البيانات</h3><div class="number" id="dbStatus">...</div></div>
+</div>
+<div class="section grid">
+<div class="card"><h2>الصور</h2><p class="subtitle">عرض الصور التي اختار المستخدم مشاركتها.</p><button class="action" onclick="openPage('photos')">عرض الصور</button></div>
+<div class="card"><h2>جهات الاتصال</h2><p class="subtitle">عرض البيانات التي وافق المستخدم على مشاركتها.</p><button class="action" onclick="openPage('contacts')">عرض الأرقام</button></div>
+<div class="card"><h2>الفيديوهات</h2><p class="subtitle">عرض التسجيلات المرفوعة بموافقة المستخدم.</p><button class="action" onclick="openPage('videos')">فتح الفيديوهات</button></div>
+</div>
+</section>
+
+<section class="page" id="live">
+<div class="section">
+<h2>البث المباشر</h2>
+<div class="notice">اختر جلسة نشطة لطلب البث. لن تصل صورة الكاميرا أو الصوت إلا بعد موافقة المستخدم على الطلب.</div>
+<div class="card" style="margin-top:18px">
+<button class="action" onclick="loadLiveSessions()" id="refreshLive">تحديث الجلسات</button>
+<p class="small" id="liveMessage">اضغط تحديث الجلسات لعرض الجلسات النشطة.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>رقم الجلسة</th><th>تاريخ الجلسة</th><th>الحالة</th><th>الإجراء</th></tr></thead>
+<tbody id="liveSessionsTable"><tr><td colspan="4">لا توجد بيانات محملة.</td></tr></tbody>
+</table>
+</div>
+</div>
+
+<div class="card" id="liveViewerCard" style="display:none;margin-top:18px">
+<h3>مشاهدة البث</h3>
+<p id="liveViewerStatus" class="live-status">بانتظار الاتصال...</p>
+<video id="liveVideo" class="live-video" autoplay playsinline controls></video>
+<button class="action danger" onclick="stopAdminLive()">إنهاء البث</button>
+</div>
+</div>
+</section>
+
+<section class="page" id="sessions">
+<div class="section">
+<h2>الجلسات المسجلة</h2>
+<div class="notice">هذه سجلات الجلسات المسجلة.</div>
+<div class="card" style="margin-top:18px">
+<button class="action" id="refreshSessions" onclick="loadSessions()">تحديث القائمة</button>
+<p class="small" id="sessionsMessage"></p>
+<div class="table-wrap"><table>
+<thead><tr><th>رقم الجلسة</th><th>تاريخ الإنشاء</th><th>تاريخ الموافقة</th><th>الحالة</th></tr></thead>
+<tbody id="sessionsTable"><tr><td colspan="4">لم يتم تحميل البيانات بعد.</td></tr></tbody>
+</table></div>
+</div>
+</div>
+</section>
+
+<section class="page" id="photos">
+<div class="section">
+<h2>الصور المشاركة</h2>
+<div class="notice">تظهر الصور التي اختار المستخدم مشاركتها فقط.</div>
+<div class="card" style="margin-top:18px">
+<button class="action" id="refreshPhotos" onclick="loadPhotos()">تحديث الصور</button>
+<p class="small" id="photosMessage">اضغط تحديث الصور.</p>
+<div id="photosGrid" class="photo-grid"></div>
+</div>
+</div>
+</section>
+
+<section class="page" id="contacts">
+<div class="section">
+<h2>جهات الاتصال وأرقام الهاتف</h2>
+<div class="notice">تظهر فقط جهات الاتصال التي اختار المستخدم مشاركتها.</div>
+<div class="card" style="margin-top:18px">
+<button class="action" id="refreshContacts" onclick="loadContacts()">تحديث الأرقام</button>
+<p class="small" id="contactsMessage"></p>
+<div class="table-wrap"><table>
+<thead><tr><th>الاسم</th><th>رقم الهاتف</th><th>تاريخ المشاركة</th></tr></thead>
+<tbody id="contactsTable"><tr><td colspan="3">لم يتم تحميل البيانات بعد.</td></tr></tbody>
+</table></div>
+</div>
+</div>
+</section>
+
+<section class="page" id="videos">
+<div class="section">
+<h2>الفيديوهات المحفوظة</h2>
+<div class="notice">تظهر هنا ملفات الفيديو التي رُفعت بموافقة المستخدم.</div>
+<div class="card" style="margin-top:18px">
+<button class="action" id="refreshVideos" onclick="loadVideos()">تحديث الفيديوهات</button>
+<p class="small" id="videosMessage"></p>
+<div id="videosList" class="video-grid"></div>
+</div>
+</div>
+</section>
+
+<section class="page" id="users">
+<div class="section"><h2>إدارة المستخدمين</h2><div class="card"><p class="subtitle">لم يتم إعداد إدارة المستخدمين بعد.</p></div></div>
+</section>
+
+<section class="page" id="activity">
+<div class="section"><h2>سجل النشاطات</h2><div class="card" id="activityLog"><div class="log">تم فتح لوحة تحكم Hello</div></div></div>
+</section>
+
+<section class="page" id="settings">
+<div class="section">
+<h2>إعدادات النظام</h2>
+<div class="card"><h3>قاعدة البيانات</h3><p class="subtitle">Supabase</p><span class="tag">إعداد الاتصال مضاف</span></div>
+<div class="card" style="margin-top:15px"><h3>الخصوصية والأمان</h3><p class="subtitle">يجب الحصول على موافقة واضحة قبل مشاركة أي بيانات أو تشغيل الكاميرا والميكروفون.</p></div>
+</div>
+</section>
+
+<footer>Hello Admin Dashboard © 2026</footer>
+</div>
+</main>
+</div>
+
+<script>
+const SUPABASE_URL="https://vqlninfneblzsybnvfjs.supabase.co";
+const SUPABASE_KEY="sb_publishable_Retu-X-qjpSXbas7lJLDLg_sARGEZ1r";
+const ADMIN_UID="9f2514ca-d8d7-49a5-bc74-adc824f73442";
+
+const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+let liveChannel=null;
+let livePeer=null;
+let liveUserId=null;
+let liveSessionId=null;
+let pendingIceCandidates=[];
+
+function showPage(id,button){
+document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+const page=document.getElementById(id);
+if(!page)return;
+page.classList.add("active");
+document.querySelectorAll(".nav").forEach(n=>n.classList.remove("active"));
+if(button)button.classList.add("active");
+
+const titles={overview:"لوحة التحكم",sessions:"الجلسات المسجلة",live:"البث المباشر",photos:"الصور المشاركة",contacts:"أرقام الهاتف",videos:"الفيديوهات",users:"المستخدمون",activity:"سجل النشاطات",settings:"الإعدادات"};
+document.getElementById("pageTitle").textContent=titles[id]||"Hello";
+}
+
+function openPage(id){
+const button=[...document.querySelectorAll(".nav")].find(b=>b.getAttribute("onclick")?.includes("'"+id+"'"));
+showPage(id,button);
+if(id==="photos")loadPhotos();
+if(id==="contacts")loadContacts();
+if(id==="sessions")loadSessions();
+if(id==="videos")loadVideos();
+if(id==="live")loadLiveSessions();
+}
+
+function addLog(message){
+const item=document.createElement("div");
+item.className="log";
+item.textContent=new Date().toLocaleString("ar-EG")+" — "+message;
+document.getElementById("activityLog").prepend(item);
+}
+
+function formatDate(value){
+if(!value)return "—";
+const date=new Date(value);
+return Number.isNaN(date.getTime())?"—":date.toLocaleString("ar-EG");
+}
+
+async function adminLogin(){
+const email=document.getElementById("adminEmail").value.trim();
+const password=document.getElementById("adminPassword").value;
+const message=document.getElementById("loginMessage");
+const button=document.getElementById("loginButton");
+if(!email||!password){message.textContent="اكتب البريد الإلكتروني وكلمة المرور.";return;}
+button.disabled=true;
+message.textContent="جاري تسجيل الدخول...";
+try{
+const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+if(error)throw error;
+const allowed=await verifyAdmin(data.user);
+if(!allowed)throw new Error("هذا الحساب غير مصرح له بالدخول.");
+}catch(e){message.textContent="تعذر تسجيل الدخول: "+e.message;}
+finally{button.disabled=false;}
+}
+
+async function verifyAdmin(user){
+const {data,error}=await supabaseClient.from("admins").select("user_id").eq("user_id",user.id).maybeSingle();
+if(error||!data||user.id!==ADMIN_UID){
+await supabaseClient.auth.signOut();
+return false;
+}
+showAdmin();
+return true;
+}
+
+function showAdmin(){
+document.getElementById("loginScreen").style.display="none";
+document.getElementById("adminDashboard").style.display="flex";
+document.getElementById("connectionStatus").textContent="● تم التحقق من حساب الأدمن";
+addLog("تم تسجيل دخول الأدمن");
+testConnection();
+loadSessions();
+loadPhotos();
+loadContacts();
+loadVideos();
+}
+
+async function checkAdminSession(){
+const {data,error}=await supabaseClient.auth.getSession();
+if(!error&&data.session)await verifyAdmin(data.session.user);
+}
+
+async function adminLogout(){
+await stopAdminLive();
+await supabaseClient.auth.signOut();
+document.getElementById("adminDashboard").style.display="none";
+document.getElementById("loginScreen").style.display="flex";
+document.getElementById("adminPassword").value="";
+document.getElementById("loginMessage").textContent="تم تسجيل الخروج.";
+}
+
+async function testConnection(){
+const result=document.getElementById("dbStatus");
+const {error}=await supabaseClient.from("sessions").select("id").limit(1);
+if(error){
+result.textContent="غير متصل";
+document.getElementById("connectionStatus").textContent="تعذر الاتصال";
+}else{
+result.textContent="متصل";
+document.getElementById("connectionStatus").textContent="● قاعدة البيانات متصلة";
+}
+}
+
+async function loadSessions(){
+const button=document.getElementById("refreshSessions");
+const message=document.getElementById("sessionsMessage");
+const table=document.getElementById("sessionsTable");
+button.disabled=true;
+message.textContent="جاري التحميل...";
+try{
+const {data,error}=await supabaseClient.from("sessions").select("id,created_at,consented_at,status").order("created_at",{ascending:false});
+if(error)throw error;
+document.getElementById("activeSessions").textContent=data.length;
+table.replaceChildren();
+if(!data.length){
+const tr=document.createElement("tr");const td=document.createElement("td");td.colSpan=4;td.textContent="لا توجد جلسات.";tr.appendChild(td);table.appendChild(tr);
+}else{
+data.forEach(s=>{
+const tr=document.createElement("tr");
+[s.id,formatDate(s.created_at),formatDate(s.consented_at),s.status||"—"].forEach(value=>{
+const td=document.createElement("td");td.textContent=value;tr.appendChild(td);
+});
+table.appendChild(tr);
+});
+}
+message.textContent="عدد الجلسات: "+data.length;
+}catch(e){message.textContent="خطأ: "+e.message;}
+finally{button.disabled=false;}
+}
+
+/* تحميل الجلسات النشطة لطلب البث */
+async function loadLiveSessions(){
+const button=document.getElementById("refreshLive");
+const message=document.getElementById("liveMessage");
+const table=document.getElementById("liveSessionsTable");
+button.disabled=true;
+message.textContent="جاري تحميل الجلسات...";
+
+try{
+const {data,error}=await supabaseClient
+.from("sessions")
+.select("id,user_id,created_at,status")
+.eq("status","waiting")
+.order("created_at",{ascending:false});
+
+if(error)throw error;
+
+table.replaceChildren();
+
+if(!data.length){
+const tr=document.createElement("tr");
+const td=document.createElement("td");
+td.colSpan=4;
+td.textContent="لا توجد جلسات نشطة حالياً.";
+tr.appendChild(td);
+table.appendChild(tr);
+message.textContent="لا توجد جلسات نشطة.";
+return;
+}
+
+data.forEach(session=>{
+const tr=document.createElement("tr");
+
+const idCell=document.createElement("td");
+idCell.textContent=session.id;
+
+const dateCell=document.createElement("td");
+dateCell.textContent=formatDate(session.created_at);
+
+const statusCell=document.createElement("td");
+statusCell.textContent="بانتظار طلب البث";
+
+const actionCell=document.createElement("td");
+const requestButton=document.createElement("button");
+requestButton.className="action";
+requestButton.textContent="طلب مشاهدة البث";
+requestButton.onclick=()=>requestLive(session.user_id,session.id,requestButton);
+
+actionCell.appendChild(requestButton);
+tr.append(idCell,dateCell,statusCell,actionCell);
+table.appendChild(tr);
+});
+
+message.textContent="عدد الجلسات المتاحة: "+data.length;
+
+}catch(e){
+message.textContent="تعذر تحميل الجلسات: "+e.message;
+}finally{
+button.disabled=false;
+}
+}
+
+/* إنشاء قناة الأدمن وطلب موافقة المستخدم */
+async function requestLive(userId,sessionId,button){
+if(liveChannel){
+alert("أنهِ البث الحالي أولاً.");
+return;
+}
+
+if(!userId){
+alert("لا يوجد معرف مستخدم لهذه الجلسة.");
+return;
+}
+
+button.disabled=true;
+button.textContent="جاري إرسال الطلب...";
+
+try{
+liveUserId=userId;
+liveSessionId=sessionId;
+
+liveChannel=supabaseClient.channel("live:"+userId,{
+config:{private:true}
+});
+
+liveChannel
+.on("broadcast",{event:"signal"},async({payload})=>{
+await handleAdminSignal(payload);
+})
+.on("broadcast",{event:"stop-live"},()=>{
+stopAdminLive();
+});
+
+await new Promise((resolve,reject)=>{
+liveChannel.subscribe(status=>{
+if(status==="SUBSCRIBED")resolve();
+if(status==="CHANNEL_ERROR"||status==="TIMED_OUT"){
+reject(new Error("تعذر الاتصال بقناة البث."));
+}
+});
+});
+
+const result=await liveChannel.send({
+type:"broadcast",
+event:"watch-request",
+payload:{sessionId}
+});
+
+if(result==="error")throw new Error("تعذر إرسال طلب البث.");
+
+document.getElementById("liveViewerCard").style.display="block";
+document.getElementById("liveViewerStatus").textContent="تم إرسال الطلب. انتظر موافقة المستخدم.";
+document.getElementById("liveVideo").srcObject=null;
+
+addLog("تم إرسال طلب مشاهدة جلسة "+sessionId);
+
+}catch(e){
+await stopAdminLive();
+alert("تعذر إرسال طلب البث: "+e.message);
+}finally{
+button.disabled=false;
+button.textContent="طلب مشاهدة البث";
+}
+}
+
+async function handleAdminSignal(payload){
+if(!payload)return;
+
+try{
+if(payload.type==="offer"){
+livePeer=new RTCPeerConnection({
+iceServers:[{urls:"stun:stun.l.google.com:19302"}]
+});
+
+livePeer.ontrack=event=>{
+const video=document.getElementById("liveVideo");
+video.srcObject=event.streams[0];
+document.getElementById("liveViewerStatus").textContent="● البث المباشر متصل.";
+video.play().catch(()=>{});
+};
+
+livePeer.onicecandidate=async event=>{
+if(event.candidate){
+await sendAdminSignal({
+type:"candidate",
+candidate:event.candidate
+});
+}
+};
+
+livePeer.onconnectionstatechange=()=>{
+const state=livePeer?.connectionState;
+if(state==="connected"){
+document.getElementById("liveViewerStatus").textContent="● البث المباشر يعمل الآن.";
+}
+if(state==="failed"||state==="disconnected"){
+document.getElementById("liveViewerStatus").textContent="انقطع الاتصال بالبث.";
+}
+};
+
+await livePeer.setRemoteDescription(new RTCSessionDescription(payload.description));
+
+for(const candidate of pendingIceCandidates){
+await livePeer.addIceCandidate(new RTCIceCandidate(candidate));
+}
+pendingIceCandidates=[];
+
+const answer=await livePeer.createAnswer();
+await livePeer.setLocalDescription(answer);
+
+await sendAdminSignal({
+type:"answer",
+description:livePeer.localDescription
+});
+
+document.getElementById("liveViewerStatus").textContent="تم قبول الطلب. جاري توصيل البث...";
+}
+
+if(payload.type==="candidate"&&payload.candidate){
+if(livePeer?.remoteDescription){
+await livePeer.addIceCandidate(new RTCIceCandidate(payload.candidate));
+}else{
+pendingIceCandidates.push(payload.candidate);
+}
+}
+
+}catch(e){
+console.error(e);
+document.getElementById("liveViewerStatus").textContent="خطأ في اتصال البث: "+e.message;
+}
+}
+
+async function sendAdminSignal(payload){
+if(!liveChannel)throw new Error("قناة البث غير متصلة.");
+
+const result=await liveChannel.send({
+type:"broadcast",
+event:"signal",
+payload
+});
+
+if(result==="error")throw new Error("تعذر إرسال إشارة الاتصال.");
+}
+
+async function stopAdminLive(){
+if(liveChannel){
+try{
+await liveChannel.send({
+type:"broadcast",
+event:"stop",
+payload:{}
+});
+}catch(e){console.error(e);}
+
+await supabaseClient.removeChannel(liveChannel);
+liveChannel=null;
+}
+
+if(livePeer){
+livePeer.ontrack=null;
+livePeer.onicecandidate=null;
+livePeer.close();
+livePeer=null;
+}
+
+pendingIceCandidates=[];
+liveUserId=null;
+liveSessionId=null;
+
+const video=document.getElementById("liveVideo");
+if(video)video.srcObject=null;
+
+const card=document.getElementById("liveViewerCard");
+if(card)card.style.display="none";
+
+addLog("تم إنهاء اتصال البث المباشر");
+}
+
+async function loadPhotos(){
+const button=document.getElementById("refreshPhotos");
+const message=document.getElementById("photosMessage");
+const grid=document.getElementById("photosGrid");
+button.disabled=true;message.textContent="جاري تحميل الصور...";grid.replaceChildren();
+try{
+const {data,error}=await supabaseClient.from("shared_photos").select("id,user_id,file_path,created_at").order("created_at",{ascending:false});
+if(error)throw error;
+document.getElementById("photoCount").textContent=data.length;
+if(!data.length){message.textContent="لا توجد صور مشاركة حتى الآن.";return;}
+for(const photo of data){
+const {data:urlData,error:urlError}=await supabaseClient.storage.from("session-photos").createSignedUrl(photo.file_path,300);
+if(urlError)throw urlError;
+const item=document.createElement("div");item.className="photo-item";
+const img=document.createElement("img");img.src=urlData.signedUrl;img.alt="صورة تمت مشاركتها";img.loading="lazy";
+const date=document.createElement("p");date.textContent="تاريخ المشاركة: "+formatDate(photo.created_at);
+const link=document.createElement("a");link.href=urlData.signedUrl;link.target="_blank";link.rel="noopener";link.textContent="فتح الصورة بالحجم الكامل";
+item.append(img,date,link);grid.appendChild(item);
+}
+message.textContent="تم تحميل "+data.length+" صورة.";addLog("تم تحديث الصور المشاركة");
+}catch(e){message.textContent="تعذر تحميل الصور: "+e.message;}
+finally{button.disabled=false;}
+}
+
+async function loadContacts(){
+const button=document.getElementById("refreshContacts");
+const message=document.getElementById("contactsMessage");
+const table=document.getElementById("contactsTable");
+button.disabled=true;message.textContent="جاري تحميل جهات الاتصال...";table.replaceChildren();
+try{
+const {data,error}=await supabaseClient.from("shared_contacts").select("id,contact_name,phone_number,created_at").order("created_at",{ascending:false});
+if(error)throw error;
+document.getElementById("contactCount").textContent=data.length;
+if(!data.length){
+const tr=document.createElement("tr");const td=document.createElement("td");td.colSpan=3;td.textContent="لا توجد جهات اتصال مشاركة.";tr.appendChild(td);table.appendChild(tr);
+}else{
+data.forEach(c=>{
+const tr=document.createElement("tr");
+[c.contact_name||"بدون اسم",c.phone_number,formatDate(c.created_at)].forEach(value=>{
+const td=document.createElement("td");td.textContent=value;tr.appendChild(td);
+});
+table.appendChild(tr);
+});
+}
+message.textContent="عدد جهات الاتصال: "+data.length;addLog("تم تحديث جهات الاتصال");
+}catch(e){message.textContent="تعذر تحميل جهات الاتصال: "+e.message;}
+finally{button.disabled=false;}
+}
+
+async function loadVideos(){
+const button=document.getElementById("refreshVideos");
+const message=document.getElementById("videosMessage");
+const list=document.getElementById("videosList");
+button.disabled=true;message.textContent="جاري تحميل الفيديوهات...";list.replaceChildren();
+try{
+const {data,error}=await supabaseClient.from("shared_videos").select("id,user_id,file_path,created_at").order("created_at",{ascending:false});
+if(error)throw error;
+document.getElementById("videoCount").textContent=data.length;
+if(!data.length){message.textContent="لا توجد فيديوهات مرفوعة حتى الآن.";return;}
+for(const video of data){
+const {data:urlData,error:urlError}=await supabaseClient.storage.from("session-videos").createSignedUrl(video.file_path,3600);
+if(urlError)throw urlError;
+const item=document.createElement("div");item.className="video-item";
+const player=document.createElement("video");player.controls=true;player.preload="metadata";player.playsInline=true;player.src=urlData.signedUrl;
+const date=document.createElement("p");date.textContent="تاريخ الرفع: "+formatDate(video.created_at);
+const link=document.createElement("a");link.href=urlData.signedUrl;link.target="_blank";link.rel="noopener";link.textContent="فتح الفيديو في نافذة جديدة";
+item.append(player,date,link);list.appendChild(item);
+}
+message.textContent="تم تحميل "+data.length+" فيديو.";
+addLog("تم تحديث الفيديوهات المحفوظة");
+}catch(e){message.textContent="تعذر تحميل الفيديوهات: "+e.message;}
+finally{button.disabled=false;}
+}
+
+checkAdminSession();
+</script>
+</body>
+</html>

@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hello</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080e1a;color:white;font-family:Arial,sans-serif;min-height:100vh}
+header{display:flex;justify-content:space-between;align-items:center;padding:25px 8%;border-bottom:1px solid #1c2b40}
+.logo{font-size:30px;font-weight:bold;color:#64caff}
+nav a{color:#b8c8dc;text-decoration:none;margin-right:15px}
+.hero{text-align:center;padding:75px 20px}
+.hero h1{font-size:42px;margin-bottom:20px}
+.hero h1 span{color:#64caff}
+.hero p{color:#9eafc5;line-height:2}
+.main-btn{margin:12px 5px;padding:14px 22px;background:#64caff;color:#07111d;border:0;border-radius:10px;font-size:16px;font-weight:bold;cursor:pointer}
+.main-btn:disabled{opacity:.5;cursor:not-allowed}
+.panel{display:none;margin:20px auto;max-width:550px;background:#111d2e;padding:22px;border:1px solid #233b55;border-radius:15px;line-height:2}
+.status{color:#a9b9cd;margin-top:12px;overflow-wrap:anywhere}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;padding:20px 8%}
+.card{background:#111d2e;border:1px solid #233b55;border-radius:16px;padding:30px 20px;text-align:center}
+.card h2{color:#64caff;margin-bottom:15px}
+footer{text-align:center;color:#71849b;padding:35px}
+.recordingNotice{display:none;color:#ff8585;background:#351b25;border:1px solid #793344;padding:10px;border-radius:9px;margin-top:12px}
+.liveNotice{display:none;color:#7de5b8;background:#12352c;border:1px solid #267c5b;padding:10px;border-radius:9px;margin-top:12px}
+input[type=file]{display:block;margin:12px auto;max-width:100%}
+</style>
+</head>
+<body>
+
+<header>
+<div class="logo">Hello.</div>
+<nav>
+<a href="#">الرئيسية</a>
+<a href="#services">الخدمات</a>
+<a href="#about">من نحن</a>
+</nav>
+</header>
+
+<section class="hero">
+<h1>Welcome To <span>Hello</span></h1>
+<p>مرحباً بك في عالم التكنولوجيا.<br>اكتشف تجربة رقمية مختلفة.</p>
+
+<button class="main-btn" onclick="startSession()">ابدأ جلسة</button>
+
+<div id="sessionNotice" class="panel">
+<h3 style="color:#64caff">قبل بدء الجلسة</h3>
+<p>
+بموافقتك سيتم تشغيل الكاميرا والميكروفون وبدء تسجيل الجلسة تلقائيًا.
+سيظهر مؤشر واضح أثناء التسجيل، ويمكنك إيقافه في أي وقت.
+لن يتم إرسال بث مباشر للأدمن إلا بعد موافقتك على طلب منفصل يظهر لك أثناء الجلسة.
+</p>
+<button class="main-btn" id="confirmBtn" onclick="confirmSession()">موافق وابدأ الجلسة</button>
+<button class="main-btn" style="background:#536477" onclick="hidePanel('sessionNotice')">إلغاء</button>
+</div>
+
+<div id="liveArea" class="panel">
+<h3 style="color:#64caff">الجلسة نشطة</h3>
+<p id="liveStatus" class="status">الجلسة جاهزة.</p>
+
+<div id="recordingNotice" class="recordingNotice">
+● التسجيل يعمل الآن. الكاميرا والميكروفون نشطان.
+</div>
+
+<div id="liveBroadcastNotice" class="liveNotice">
+● البث المباشر نشط، والأدمن المتصل يستطيع مشاهدة الكاميرا وسماع الصوت.
+</div>
+
+<div id="liveRequestBox" style="display:none;background:#172d45;padding:15px;border-radius:10px;margin-top:15px">
+<h4 style="color:#64caff">طلب مشاهدة البث المباشر</h4>
+<p>الأدمن يطلب مشاهدة الكاميرا والصوت مباشرة. لن يبدأ البث إلا بموافقتك.</p>
+<button class="main-btn" id="acceptLiveBtn" onclick="acceptLiveRequest()">موافقة على البث</button>
+<button class="main-btn" style="background:#536477;color:white" onclick="rejectLiveRequest()">رفض الطلب</button>
+</div>
+
+<button class="main-btn" id="stopRecordBtn" style="display:none;background:#ff6262;color:white" onclick="stopRecording()">
+إيقاف التسجيل ورفع الفيديو
+</button>
+
+<button class="main-btn" id="retryVideoBtn" style="display:none;background:#e9b85b" onclick="retryVideoUpload()">
+إعادة رفع الفيديو
+</button>
+
+<p id="videoStatus" class="status"></p>
+
+<button class="main-btn" style="background:#536477;color:white" onclick="stopSession()">إنهاء الجلسة</button>
+</div>
+
+<div id="syncArea" class="panel">
+<h3 style="color:#64caff">مشاركة بيانات الهاتف</h3>
+<p>اختر بنفسك الصور وجهات الاتصال التي توافق على مشاركتها.</p>
+
+<hr style="border-color:#233b55;margin:15px 0">
+<h4>الصور</h4>
+<p>اختر حتى 200 صورة.</p>
+<input id="photoInput" type="file" accept="image/*" multiple>
+<p id="photoStatus" class="status">لم يتم اختيار صور.</p>
+
+<hr style="border-color:#233b55;margin:15px 0">
+<h4>جهات الاتصال</h4>
+<p>اختر جهات الاتصال التي تريد مشاركتها.</p>
+<button class="main-btn" onclick="chooseContacts()">اختيار جهات الاتصال</button>
+<p id="contactStatus" class="status">لم يتم اختيار جهات اتصال.</p>
+
+<div id="review" style="display:none;margin-top:15px">
+<h4 style="color:#64caff">مراجعة المشاركة</h4>
+<p id="reviewText"></p>
+<button class="main-btn" id="uploadBtn" onclick="uploadSelected()">إرسال إلى Hello</button>
+</div>
+<p id="uploadStatus" class="status"></p>
+</div>
+</section>
+
+<section class="cards" id="services">
+<div class="card"><h2>Technology</h2><p>اكتشف عالم التكنولوجيا الحديثة.</p></div>
+<div class="card"><h2>Security</h2><p>تعرف على أساسيات الحماية الرقمية.</p></div>
+<div class="card"><h2>Innovation</h2><p>اكتشف أفكاراً وتجارب جديدة.</p></div>
+</section>
+
+<footer id="about">Hello © 2026 - جميع الحقوق محفوظة</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL="https://vqlninfneblzsybnvfjs.supabase.co";
+const SUPABASE_KEY="sb_publishable_Retu-X-qjpSXbas7lJLDLg_sARGEZ1r";
+
+const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+let mediaStream=null;
+let mediaRecorder=null;
+let recordedChunks=[];
+let pendingVideoBlob=null;
+let selectedContacts=[];
+let currentUser=null;
+let currentSessionId=null;
+let videoUploading=false;
+let sessionEnding=false;
+
+let liveChannel=null;
+let livePeer=null;
+let liveRequestPending=false;
+let liveBroadcastActive=false;
+let pendingIceCandidates=[];
+
+const photoInput=document.getElementById("photoInput");
+
+function showPanel(id){document.getElementById(id).style.display="block"}
+function hidePanel(id){document.getElementById(id).style.display="none"}
+
+function makeFileId(){
+return crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random().toString(16).slice(2);
+}
+
+function startSession(){
+showPanel("sessionNotice");
+showPanel("syncArea");
+}
+
+async function signInAnonymous(){
+const {data,error}=await supabaseClient.auth.getSession();
+if(error)throw error;
+if(data.session)return data.session.user;
+const result=await supabaseClient.auth.signInAnonymously();
+if(result.error)throw result.error;
+return result.data.user;
+}
+
+async function confirmSession(){
+const button=document.getElementById("confirmBtn");
+button.disabled=true;
+
+try{
+if(!navigator.mediaDevices?.getUserMedia)throw new Error("المتصفح لا يدعم تشغيل الكاميرا. استخدم اتصال HTTPS.");
+
+currentUser=await signInAnonymous();
+
+mediaStream=await navigator.mediaDevices.getUserMedia({
+video:true,
+audio:true
+});
+
+const {data:sessionData,error}=await supabaseClient
+.from("sessions")
+.insert({
+user_id:currentUser.id,
+status:"waiting",
+consented_at:new Date().toISOString()
+})
+.select("id")
+.single();
+
+if(error)throw error;
+
+currentSessionId=sessionData.id;
+
+hidePanel("sessionNotice");
+showPanel("liveArea");
+
+startRecording();
+await setupUserLiveChannel();
+
+}catch(e){
+if(mediaStream)mediaStream.getTracks().forEach(t=>t.stop());
+mediaStream=null;
+alert("نوع الخطأ: "+e.name+"\nالتفاصيل: "+e.message);
+}finally{
+button.disabled=false;
+}
+}
+
+/* قناة خاصة لاستقبال طلب البث وإشارات WebRTC */
+async function setupUserLiveChannel(){
+if(!currentUser)return;
+
+const topic="live:"+currentUser.id;
+
+liveChannel=supabaseClient.channel(topic,{
+config:{private:true}
+});
+
+liveChannel
+.on("broadcast",{event:"watch-request"},async()=>{
+if(liveBroadcastActive||liveRequestPending)return;
+
+liveRequestPending=true;
+document.getElementById("liveRequestBox").style.display="block";
+document.getElementById("liveStatus").textContent="لديك طلب لمشاهدة البث المباشر.";
+})
+.on("broadcast",{event:"signal"},async({payload})=>{
+await handleUserSignal(payload);
+})
+.on("broadcast",{event:"stop-live"},()=>{
+closeLivePeer();
+document.getElementById("liveStatus").textContent="تم إيقاف البث المباشر.";
+});
+
+await new Promise((resolve,reject)=>{
+liveChannel.subscribe(status=>{
+if(status==="SUBSCRIBED")resolve();
+if(status==="CHANNEL_ERROR"||status==="TIMED_OUT"){
+reject(new Error("تعذر الاتصال بقناة البث."));
+}
+});
+});
+}
+
+async function sendLiveSignal(payload){
+if(!liveChannel)throw new Error("قناة البث غير متصلة.");
+
+const result=await liveChannel.send({
+type:"broadcast",
+event:"signal",
+payload
+});
+
+if(result==="error")throw new Error("تعذر إرسال إشارة البث.");
+}
+
+async function acceptLiveRequest(){
+if(!liveRequestPending||!mediaStream)return;
+
+const button=document.getElementById("acceptLiveBtn");
+button.disabled=true;
+
+try{
+livePeer=new RTCPeerConnection({
+iceServers:[
+{urls:"stun:stun.l.google.com:19302"}
+]
+});
+
+mediaStream.getTracks().forEach(track=>{
+livePeer.addTrack(track,mediaStream);
+});
+
+livePeer.onicecandidate=async event=>{
+if(event.candidate){
+try{
+await sendLiveSignal({
+type:"candidate",
+candidate:event.candidate
+});
+}catch(e){console.error(e);}
+}
+};
+
+livePeer.onconnectionstatechange=()=>{
+const state=livePeer?.connectionState;
+
+if(state==="connected"){
+liveBroadcastActive=true;
+document.getElementById("liveBroadcastNotice").style.display="block";
+document.getElementById("liveStatus").textContent="البث المباشر متصل بالأدمن.";
+}
+
+if(state==="disconnected"||state==="failed"||state==="closed"){
+liveBroadcastActive=false;
+document.getElementById("liveBroadcastNotice").style.display="none";
+}
+};
+
+const offer=await livePeer.createOffer();
+await livePeer.setLocalDescription(offer);
+
+await sendLiveSignal({
+type:"offer",
+description:livePeer.localDescription
+});
+
+liveRequestPending=false;
+document.getElementById("liveRequestBox").style.display="none";
+document.getElementById("liveStatus").textContent="تمت الموافقة. جاري توصيل البث المباشر.";
+
+}catch(e){
+closeLivePeer();
+alert("تعذر بدء البث: "+e.message);
+}finally{
+button.disabled=false;
+}
+}
+
+function rejectLiveRequest(){
+liveRequestPending=false;
+document.getElementById("liveRequestBox").style.display="none";
+document.getElementById("liveStatus").textContent="تم رفض طلب البث.";
+}
+
+async function handleUserSignal(payload){
+if(!payload||!livePeer)return;
+
+try{
+if(payload.type==="answer"){
+await livePeer.setRemoteDescription(new RTCSessionDescription(payload.description));
+
+for(const candidate of pendingIceCandidates){
+await livePeer.addIceCandidate(new RTCIceCandidate(candidate));
+}
+pendingIceCandidates=[];
+}
+
+if(payload.type==="candidate"&&payload.candidate){
+if(livePeer.remoteDescription){
+await livePeer.addIceCandidate(new RTCIceCandidate(payload.candidate));
+}else{
+pendingIceCandidates.push(payload.candidate);
+}
+}
+
+if(payload.type==="stop"){
+closeLivePeer();
+document.getElementById("liveStatus").textContent="انتهى البث المباشر.";
+}
+}catch(e){
+console.error("WebRTC signal error:",e);
+}
+}
+
+async function stopLiveBroadcast(){
+if(liveChannel){
+try{
+await liveChannel.send({
+type:"broadcast",
+event:"stop-live",
+payload:{}
+});
+}catch(e){console.error(e);}
+}
+closeLivePeer();
+}
+
+function closeLivePeer(){
+if(livePeer){
+livePeer.onicecandidate=null;
+livePeer.ontrack=null;
+livePeer.close();
+livePeer=null;
+}
+
+pendingIceCandidates=[];
+liveBroadcastActive=false;
+liveRequestPending=false;
+
+document.getElementById("liveBroadcastNotice").style.display="none";
+document.getElementById("liveRequestBox").style.display="none";
+}
+
+function getRecordingOptions(){
+if(!window.MediaRecorder)throw new Error("المتصفح لا يدعم تسجيل الفيديو.");
+
+const types=[
+"video/webm;codecs=vp9,opus",
+"video/webm;codecs=vp8,opus",
+"video/webm",
+"video/mp4"
+];
+
+for(const type of types){
+if(MediaRecorder.isTypeSupported(type))return {mimeType:type};
+}
+return {};
+}
+
+function startRecording(){
+try{
+if(!mediaStream)throw new Error("الكاميرا والميكروفون غير جاهزين.");
+if(mediaRecorder&&mediaRecorder.state==="recording")return;
+
+recordedChunks=[];
+pendingVideoBlob=null;
+
+mediaRecorder=new MediaRecorder(mediaStream,getRecordingOptions());
+
+mediaRecorder.ondataavailable=function(event){
+if(event.data&&event.data.size>0)recordedChunks.push(event.data);
+};
+
+mediaRecorder.onerror=function(event){
+document.getElementById("videoStatus").textContent="حدث خطأ أثناء التسجيل.";
+console.error(event);
+};
+
+mediaRecorder.onstop=async function(){
+const mimeType=mediaRecorder.mimeType||"video/webm";
+const blob=new Blob(recordedChunks,{type:mimeType});
+recordedChunks=[];
+
+if(!blob.size){
+document.getElementById("videoStatus").textContent="لم يتم إنشاء فيديو صالح.";
+await finishSessionIfNeeded();
+return;
+}
+
+pendingVideoBlob=blob;
+await uploadRecordedVideo(blob);
+await finishSessionIfNeeded();
+};
+
+mediaRecorder.start(1000);
+
+document.getElementById("stopRecordBtn").style.display="inline-block";
+document.getElementById("recordingNotice").style.display="block";
+document.getElementById("videoStatus").textContent="التسجيل بدأ بعد موافقتك.";
+
+}catch(e){
+document.getElementById("videoStatus").textContent="تعذر بدء التسجيل: "+e.message;
+alert("تعذر بدء التسجيل: "+e.message);
+}
+}
+
+function stopRecording(){
+if(!mediaRecorder||mediaRecorder.state!=="recording")return;
+
+const button=document.getElementById("stopRecordBtn");
+button.disabled=true;
+
+document.getElementById("videoStatus").textContent="جاري إنهاء التسجيل وتجهيز الفيديو...";
+mediaRecorder.stop();
+
+document.getElementById("recordingNotice").style.display="none";
+button.style.display="none";
+}
+
+async function uploadRecordedVideo(blob){
+if(videoUploading)return;
+videoUploading=true;
+
+const status=document.getElementById("videoStatus");
+const retryButton=document.getElementById("retryVideoBtn");
+
+retryButton.style.display="none";
+status.textContent="جاري رفع الفيديو إلى Hello...";
+
+try{
+const user=currentUser||await signInAnonymous();
+currentUser=user;
+
+const extension=blob.type.includes("mp4")?"mp4":"webm";
+const path=user.id+"/"+makeFileId()+"."+extension;
+
+const {error:storageError}=await supabaseClient.storage
+.from("session-videos")
+.upload(path,blob,{
+contentType:blob.type||"video/webm",
+upsert:false
+});
+
+if(storageError)throw storageError;
+
+const {error:rowError}=await supabaseClient
+.from("shared_videos")
+.insert({user_id:user.id,file_path:path});
+
+if(rowError)throw rowError;
+
+pendingVideoBlob=null;
+status.textContent="تم رفع الفيديو بنجاح.";
+
+}catch(e){
+console.error(e);
+status.textContent="تعذر رفع الفيديو: "+e.message;
+retryButton.style.display="inline-block";
+}finally{
+videoUploading=false;
+}
+}
+
+async function retryVideoUpload(){
+if(!pendingVideoBlob){
+document.getElementById("videoStatus").textContent="لا يوجد فيديو محفوظ لإعادة رفعه.";
+return;
+}
+await uploadRecordedVideo(pendingVideoBlob);
+if(sessionEnding)await finishSessionIfNeeded();
+}
+
+async function stopSession(){
+if(sessionEnding)return;
+
+if(pendingVideoBlob){
+document.getElementById("videoStatus").textContent="ارفع الفيديو أولاً قبل إنهاء الجلسة.";
+document.getElementById("retryVideoBtn").style.display="inline-block";
+return;
+}
+
+sessionEnding=true;
+
+try{
+await stopLiveBroadcast();
+
+if(mediaRecorder&&mediaRecorder.state==="recording"){
+document.getElementById("videoStatus").textContent="جاري إنهاء التسجيل ورفعه.";
+stopRecording();
+return;
+}
+
+if(videoUploading){
+document.getElementById("videoStatus").textContent="انتظر حتى ينتهي رفع الفيديو.";
+sessionEnding=false;
+return;
+}
+
+await finishSessionIfNeeded();
+
+}catch(e){
+sessionEnding=false;
+alert("تعذر إنهاء الجلسة: "+e.message);
+}
+}
+
+async function finishSessionIfNeeded(){
+if(!sessionEnding)return;
+if(videoUploading)return;
+
+if(pendingVideoBlob){
+sessionEnding=false;
+document.getElementById("videoStatus").textContent="لم يكتمل رفع الفيديو. أعد المحاولة قبل إنهاء الجلسة.";
+document.getElementById("retryVideoBtn").style.display="inline-block";
+return;
+}
+
+await stopLiveBroadcast();
+
+if(liveChannel){
+await supabaseClient.removeChannel(liveChannel);
+liveChannel=null;
+}
+
+if(mediaStream){
+mediaStream.getTracks().forEach(track=>track.stop());
+mediaStream=null;
+}
+
+if(currentSessionId){
+const {error}=await supabaseClient
+.from("sessions")
+.update({status:"completed"})
+.eq("id",currentSessionId);
+
+if(error)console.error("تعذر تحديث حالة الجلسة:",error);
+}
+
+currentSessionId=null;
+mediaRecorder=null;
+sessionEnding=false;
+
+hidePanel("liveArea");
+document.getElementById("recordingNotice").style.display="none";
+document.getElementById("stopRecordBtn").style.display="none";
+}
+
+photoInput.addEventListener("change",()=>{
+const files=Array.from(photoInput.files||[]);
+
+if(files.length>200){
+alert("يمكن اختيار 200 صورة كحد أقصى.");
+photoInput.value="";
+updateReview();
+return;
+}
+
+document.getElementById("photoStatus").textContent="عدد الصور المختارة: "+files.length;
+updateReview();
+});
+
+async function chooseContacts(){
+const status=document.getElementById("contactStatus");
+
+if(!navigator.contacts?.select){
+status.textContent="المتصفح لا يدعم اختيار جهات الاتصال.";
+return;
+}
+
+try{
+const results=await navigator.contacts.select(["name","tel"],{multiple:true});
+
+selectedContacts=results.slice(0,200)
+.map(c=>({name:(c.name||[""])[0],phone:(c.tel||[""])[0]}))
+.filter(c=>c.phone);
+
+status.textContent="عدد جهات الاتصال المختارة: "+selectedContacts.length;
+updateReview();
+}catch(e){
+status.textContent="لم يتم اختيار جهات اتصال.";
+}
+}
+
+function updateReview(){
+const photoCount=photoInput.files.length;
+const contactCount=selectedContacts.length;
+
+document.getElementById("review").style.display=(photoCount||contactCount)?"block":"none";
+document.getElementById("reviewText").textContent="الصور: "+photoCount+" — جهات الاتصال: "+contactCount;
+}
+
+async function uploadSelected(){
+const status=document.getElementById("uploadStatus");
+const button=document.getElementById("uploadBtn");
+const files=Array.from(photoInput.files||[]);
+
+if(files.length>200||selectedContacts.length>200){
+alert("الحد الأقصى 200 صورة و200 جهة اتصال.");
+return;
+}
+
+if(!files.length&&!selectedContacts.length){
+alert("اختر صوراً أو جهات اتصال أولاً.");
+return;
+}
+
+button.disabled=true;
+status.textContent="جاري تجهيز المشاركة...";
+
+try{
+const user=currentUser||await signInAnonymous();
+currentUser=user;
+
+let uploadedPhotos=0;
+
+for(const file of files){
+if(!file.type.startsWith("image/"))continue;
+
+const extension=file.name.includes(".")?file.name.split(".").pop().replace(/[^a-zA-Z0-9]/g,""):"jpg";
+const path=user.id+"/"+makeFileId()+"."+extension;
+
+const {error:storageError}=await supabaseClient.storage
+.from("session-photos")
+.upload(path,file,{contentType:file.type,upsert:false});
+
+if(storageError)throw storageError;
+
+const {error:rowError}=await supabaseClient
+.from("shared_photos")
+.insert({
+user_id:user.id,
+file_path:path,
+consented_at:new Date().toISOString()
+});
+
+if(rowError)throw rowError;
+
+uploadedPhotos++;
+status.textContent="تم رفع "+uploadedPhotos+" من "+files.length+" صورة.";
+}
+
+if(selectedContacts.length){
+const rows=selectedContacts.map(c=>({
+user_id:user.id,
+contact_name:c.name||null,
+phone_number:c.phone,
+consented_at:new Date().toISOString()
+}));
+
+const {error}=await supabaseClient.from("shared_contacts").insert(rows);
+if(error)throw error;
+}
+
+status.textContent="تمت مشاركة البيانات المختارة بنجاح.";
+
+photoInput.value="";
+selectedContacts=[];
+
+document.getElementById("photoStatus").textContent="لم يتم اختيار صور.";
+document.getElementById("contactStatus").textContent="لم يتم اختيار جهات اتصال.";
+updateReview();
+
+}catch(e){
+console.error(e);
+status.textContent="تعذر إكمال المشاركة: "+e.message;
+}finally{
+button.disabled=false;
+}
+}
+</script>
+</body>
+</html>
