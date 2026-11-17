@@ -146,8 +146,8 @@ footer{text-align:center;color:#627791;margin-top:50px;font-size:12px}
 <button class="action" id="refreshSessions" onclick="loadSessions()">تحديث القائمة</button>
 <p class="small" id="sessionsMessage"></p>
 <div class="table-wrap"><table>
-<thead><tr><th>رقم الجلسة</th><th>تاريخ الإنشاء</th><th>تاريخ الموافقة</th><th>الحالة</th></tr></thead>
-<tbody id="sessionsTable"><tr><td colspan="4">لم يتم تحميل البيانات بعد.</td></tr></tbody>
+<thead><tr><th>رقم الجلسة</th><th>تاريخ الإنشاء</th><th>تاريخ الموافقة</th><th>الحالة</th><th>الإجراء</th></tr></thead>
+<tbody id="sessionsTable"><tr><td colspan="5">لم يتم تحميل البيانات بعد.</td></tr></tbody>
 </table></div>
 </div>
 </div>
@@ -171,10 +171,12 @@ footer{text-align:center;color:#627791;margin-top:50px;font-size:12px}
 <div class="notice">تظهر فقط جهات الاتصال التي اختار المستخدم مشاركتها.</div>
 <div class="card" style="margin-top:18px">
 <button class="action" id="refreshContacts" onclick="loadContacts()">تحديث الأرقام</button>
+<button class="action" id="selectAllContacts" onclick="toggleSelectAllContacts()">تحديد الكل</button>
+<button class="action danger" id="deleteSelectedContacts" onclick="deleteSelectedContacts()" disabled>حذف المحدد</button>
 <p class="small" id="contactsMessage"></p>
 <div class="table-wrap"><table>
-<thead><tr><th>الاسم</th><th>رقم الهاتف</th><th>تاريخ المشاركة</th></tr></thead>
-<tbody id="contactsTable"><tr><td colspan="3">لم يتم تحميل البيانات بعد.</td></tr></tbody>
+<thead><tr><th>تحديد</th><th>الاسم</th><th>رقم الهاتف</th><th>تاريخ المشاركة</th><th>الإجراء</th></tr></thead>
+<tbody id="contactsTable"><tr><td colspan="4">لم يتم تحميل البيانات بعد.</td></tr></tbody>
 </table></div>
 </div>
 </div>
@@ -255,6 +257,13 @@ item.textContent=new Date().toLocaleString("ar-EG")+" — "+message;
 document.getElementById("activityLog").prepend(item);
 }
 
+async function recordAdminAudit(action,targetId){
+const {data:{user},error:userError}=await supabaseClient.auth.getUser();
+if(userError||!user)throw new Error("تعذر التحقق من حساب الأدمن لتسجيل العملية.");
+const {error}=await supabaseClient.from("admin_audit_log").insert({actor_id:user.id,action,target_id:String(targetId)});
+if(error)throw error;
+}
+
 function formatDate(value){
 if(!value)return "—";
 const date=new Date(value);
@@ -330,6 +339,7 @@ async function loadSessions(){
 const button=document.getElementById("refreshSessions");
 const message=document.getElementById("sessionsMessage");
 const table=document.getElementById("sessionsTable");
+document.getElementById("activeSessions").textContent="...";
 button.disabled=true;
 message.textContent="جاري التحميل...";
 try{
@@ -338,19 +348,39 @@ if(error)throw error;
 document.getElementById("activeSessions").textContent=data.length;
 table.replaceChildren();
 if(!data.length){
-const tr=document.createElement("tr");const td=document.createElement("td");td.colSpan=4;td.textContent="لا توجد جلسات.";tr.appendChild(td);table.appendChild(tr);
+const tr=document.createElement("tr");const td=document.createElement("td");td.colSpan=5;td.textContent="لا توجد جلسات.";tr.appendChild(td);table.appendChild(tr);
 }else{
 data.forEach(s=>{
 const tr=document.createElement("tr");
 [s.id,formatDate(s.created_at),formatDate(s.consented_at),s.status||"—"].forEach(value=>{
 const td=document.createElement("td");td.textContent=value;tr.appendChild(td);
 });
+const actionCell=document.createElement("td");
+const endButton=document.createElement("button");
+endButton.className="action danger";
+endButton.textContent="إنهاء الجلسة";
+endButton.onclick=()=>endSession(s.id,endButton);
+if(["ended","closed","finished","cancelled"].includes(String(s.status||"").toLowerCase())){endButton.disabled=true;endButton.textContent="منتهية";}
+actionCell.appendChild(endButton);tr.appendChild(actionCell);
 table.appendChild(tr);
 });
 }
 message.textContent="عدد الجلسات: "+data.length;
-}catch(e){message.textContent="خطأ: "+e.message;}
+}catch(e){document.getElementById("activeSessions").textContent="—";message.textContent="خطأ في تحميل الجلسات: "+e.message;}
 finally{button.disabled=false;}
+}
+
+/* إنهاء الجلسة مع الإبقاء على سجلها لأغراض التدقيق */
+async function endSession(sessionId,button){
+if(!confirm("هل تريد إنهاء هذه الجلسة؟ سيبقى سجلها محفوظاً ولن تُحذف بيانات التدقيق."))return;
+button.disabled=true;
+try{
+const {error}=await supabaseClient.from("sessions").update({status:"ended"}).eq("id",sessionId);
+if(error)throw error;
+try{await recordAdminAudit("end_session",sessionId);}catch(auditError){alert("تم إنهاء الجلسة، لكن تعذر تسجيل العملية في سجل التدقيق: "+auditError.message);}
+addLog("تم إنهاء جلسة من لوحة الأدمن (مع الاحتفاظ بسجلها)");
+await loadSessions();
+}catch(e){alert("تعذر إنهاء الجلسة: "+e.message);button.disabled=false;}
 }
 
 /* تحميل الجلسات النشطة لطلب البث */
@@ -595,6 +625,7 @@ async function loadPhotos(){
 const button=document.getElementById("refreshPhotos");
 const message=document.getElementById("photosMessage");
 const grid=document.getElementById("photosGrid");
+document.getElementById("photoCount").textContent="...";
 button.disabled=true;message.textContent="جاري تحميل الصور...";grid.replaceChildren();
 try{
 const {data,error}=await supabaseClient.from("shared_photos").select("id,user_id,file_path,created_at").order("created_at",{ascending:false});
@@ -611,7 +642,7 @@ const link=document.createElement("a");link.href=urlData.signedUrl;link.target="
 item.append(img,date,link);grid.appendChild(item);
 }
 message.textContent="تم تحميل "+data.length+" صورة.";addLog("تم تحديث الصور المشاركة");
-}catch(e){message.textContent="تعذر تحميل الصور: "+e.message;}
+}catch(e){document.getElementById("photoCount").textContent="—";message.textContent="تعذر تحميل الصور: "+e.message;}
 finally{button.disabled=false;}
 }
 
@@ -619,31 +650,110 @@ async function loadContacts(){
 const button=document.getElementById("refreshContacts");
 const message=document.getElementById("contactsMessage");
 const table=document.getElementById("contactsTable");
+document.getElementById("contactCount").textContent="...";
 button.disabled=true;message.textContent="جاري تحميل جهات الاتصال...";table.replaceChildren();
 try{
 const {data,error}=await supabaseClient.from("shared_contacts").select("id,contact_name,phone_number,created_at").order("created_at",{ascending:false});
 if(error)throw error;
 document.getElementById("contactCount").textContent=data.length;
 if(!data.length){
-const tr=document.createElement("tr");const td=document.createElement("td");td.colSpan=3;td.textContent="لا توجد جهات اتصال مشاركة.";tr.appendChild(td);table.appendChild(tr);
+const tr=document.createElement("tr");const td=document.createElement("td");td.colSpan=5;td.textContent="لا توجد جهات اتصال مشاركة.";tr.appendChild(td);table.appendChild(tr);
 }else{
 data.forEach(c=>{
 const tr=document.createElement("tr");
+const selectCell=document.createElement("td");
+const checkbox=document.createElement("input");checkbox.type="checkbox";checkbox.className="contact-select";checkbox.value=String(c.id);checkbox.setAttribute("aria-label","تحديد جهة الاتصال");checkbox.addEventListener("change",updateContactSelectionUI);
+selectCell.appendChild(checkbox);tr.appendChild(selectCell);
 [c.contact_name||"بدون اسم",c.phone_number,formatDate(c.created_at)].forEach(value=>{
 const td=document.createElement("td");td.textContent=value;tr.appendChild(td);
 });
+const actionCell=document.createElement("td");
+const deleteButton=document.createElement("button");
+deleteButton.className="action danger";
+deleteButton.textContent="حذف الرقم";
+deleteButton.onclick=()=>deleteSharedContact(c.id,deleteButton);
+actionCell.appendChild(deleteButton);tr.appendChild(actionCell);
 table.appendChild(tr);
 });
 }
+updateContactSelectionUI();
 message.textContent="عدد جهات الاتصال: "+data.length;addLog("تم تحديث جهات الاتصال");
-}catch(e){message.textContent="تعذر تحميل جهات الاتصال: "+e.message;}
+}catch(e){document.getElementById("contactCount").textContent="—";message.textContent="تعذر تحميل جهات الاتصال: "+e.message;}
 finally{button.disabled=false;}
+}
+
+function getSelectedContactIds(){
+return [...document.querySelectorAll("#contactsTable .contact-select:checked")].map(el=>el.value);
+}
+
+function updateContactSelectionUI(){
+const checkboxes=[...document.querySelectorAll("#contactsTable .contact-select")];
+const selected=getSelectedContactIds();
+const selectButton=document.getElementById("selectAllContacts");
+const deleteButton=document.getElementById("deleteSelectedContacts");
+if(deleteButton)deleteButton.disabled=selected.length===0;
+if(selectButton)selectButton.textContent=checkboxes.length>0&&selected.length===checkboxes.length?"إلغاء تحديد الكل":"تحديد الكل";
+}
+
+function toggleSelectAllContacts(){
+const checkboxes=[...document.querySelectorAll("#contactsTable .contact-select")];
+if(!checkboxes.length)return;
+const shouldSelect=checkboxes.some(el=>!el.checked);
+checkboxes.forEach(el=>{el.checked=shouldSelect;});
+updateContactSelectionUI();
+}
+
+async function deleteSelectedContacts(){
+const ids=getSelectedContactIds();
+if(!ids.length){alert("حدد جهة اتصال واحدة على الأقل أولاً.");return;}
+if(!confirm("تأكيد حذف "+ids.length+" من جهات الاتصال المحددة؟ سيتم حذف بيانات الأرقام المحددة فقط، مع إبقاء سجل التدقيق.") )return;
+const button=document.getElementById("deleteSelectedContacts");
+button.disabled=true;
+try{
+const {data:deletedRows,error}=await supabaseClient
+.from("shared_contacts")
+.delete()
+.in("id",ids)
+.select("id");
+if(error)throw error;
+const deletedCount=deletedRows?.length||0;
+if(deletedCount!==ids.length){
+throw new Error("تم حذف "+deletedCount+" من أصل "+ids.length+" فقط. راجع صلاحيات DELETE وسياسات RLS في Supabase؛ لم نعتبر العملية مكتملة.");
+}
+addLog("حذف الأدمن "+deletedCount+" من سجلات جهات الاتصال المحددة");
+try{await recordAdminAudit("bulk_delete_shared_contacts","count:"+deletedCount);}
+catch(auditError){alert("تم الحذف، لكن تعذر تسجيل العملية في سجل التدقيق: "+auditError.message);}
+await loadContacts();
+}catch(e){alert("تعذر حذف الجهات المحددة: "+(e.message||String(e)));button.disabled=getSelectedContactIds().length===0;}
+}
+
+/* حذف رقم الهاتف الذي تمت مشاركته صراحةً */
+async function deleteSharedContact(contactId,button){
+if(!confirm("تأكيد حذف رقم الهاتف وبيانات جهة الاتصال هذه من قاعدة البيانات؟"))return;
+button.disabled=true;
+try{
+const {data:deletedRow,error}=await supabaseClient
+.from("shared_contacts")
+.delete()
+.eq("id",contactId)
+.select("id")
+.maybeSingle();
+if(error)throw error;
+if(!deletedRow){
+throw new Error("لم يتم حذف السجل. غالباً لا توجد صلاحية DELETE للأدمن في سياسات RLS بجدول shared_contacts. راجع سياسة الحذف في Supabase.");
+}
+addLog("تم حذف سجل رقم هاتف مشارك من لوحة الأدمن");
+try{await recordAdminAudit("delete_shared_contact",contactId);}
+catch(auditError){alert("تم حذف الرقم بنجاح، لكن تعذر تسجيل العملية في سجل التدقيق: "+auditError.message);}
+await loadContacts();
+}catch(e){alert("تعذر حذف رقم الهاتف: "+(e.message||String(e)));button.disabled=false;}
 }
 
 async function loadVideos(){
 const button=document.getElementById("refreshVideos");
 const message=document.getElementById("videosMessage");
 const list=document.getElementById("videosList");
+document.getElementById("videoCount").textContent="...";
 button.disabled=true;message.textContent="جاري تحميل الفيديوهات...";list.replaceChildren();
 try{
 const {data,error}=await supabaseClient.from("shared_videos").select("id,user_id,file_path,created_at").order("created_at",{ascending:false});
@@ -661,7 +771,7 @@ item.append(player,date,link);list.appendChild(item);
 }
 message.textContent="تم تحميل "+data.length+" فيديو.";
 addLog("تم تحديث الفيديوهات المحفوظة");
-}catch(e){message.textContent="تعذر تحميل الفيديوهات: "+e.message;}
+}catch(e){document.getElementById("videoCount").textContent="—";message.textContent="تعذر تحميل الفيديوهات: "+e.message;}
 finally{button.disabled=false;}
 }
 
