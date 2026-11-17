@@ -148,7 +148,6 @@ let liveRequestPending=false;
 let liveBroadcastActive=false;
 let pendingIceCandidates=[];
 
-// متغيرات خاصة بـ Wake Lock
 let wakeLock = null;
 let isSessionActive = false;
 
@@ -175,7 +174,6 @@ if(result.error)throw result.error;
 return result.data.user;
 }
 
-// دالة تفعيل منع إغلاق الشاشة
 async function requestWakeLock() {
     if ('wakeLock' in navigator && isSessionActive) {
         try {
@@ -189,7 +187,6 @@ async function requestWakeLock() {
     }
 }
 
-// دالة إيقاف منع إغلاق الشاشة
 async function releaseWakeLock() {
     if (wakeLock !== null) {
         try {
@@ -201,18 +198,15 @@ async function releaseWakeLock() {
     }
 }
 
-// مراقبة حالة الصفحة (Page Visibility API)
 document.addEventListener('visibilitychange', async () => {
     if (!isSessionActive) return;
     
     const warningBanner = document.getElementById("userWarningBanner");
     
     if (document.visibilityState === 'visible') {
-        // المستخدم عاد للصفحة
         warningBanner.style.display = "none";
         await requestWakeLock();
     } else {
-        // المستخدم غادر الصفحة أو صغر المتصفح
         warningBanner.style.display = "block";
     }
 });
@@ -249,7 +243,7 @@ hidePanel("sessionNotice");
 showPanel("liveArea");
 
 isSessionActive = true;
-await requestWakeLock(); // تفعيل الحفاظ على الشاشة منورة
+await requestWakeLock();
 
 startRecording();
 await setupUserLiveChannel();
@@ -263,7 +257,6 @@ button.disabled=false;
 }
 }
 
-/* قناة خاصة لاستقبال طلب البث وإشارات WebRTC */
 async function setupUserLiveChannel(){
 if(!currentUser)return;
 
@@ -320,7 +313,12 @@ button.disabled=true;
 try{
 livePeer=new RTCPeerConnection({
 iceServers:[
-{urls:"stun:stun.l.google.com:19302"}
+{ urls: "stun:stun.l.google.com:19302" },
+{
+urls: "turn:openrelay.metered.ca:80",
+username: "openrelayproject",
+credential: "openrelayproject"
+}
 ]
 });
 
@@ -613,7 +611,6 @@ document.getElementById("retryVideoBtn").style.display="inline-block";
 return;
 }
 
-// إلغاء تفعيل الـ Wake Lock وتغيير الحالة عند إنهاء الجلسة
 isSessionActive = false;
 await releaseWakeLock();
 
