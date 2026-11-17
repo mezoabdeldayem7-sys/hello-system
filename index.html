@@ -24,6 +24,7 @@ nav a{color:#b8c8dc;text-decoration:none;margin-right:15px}
 footer{text-align:center;color:#71849b;padding:35px}
 .recordingNotice{display:none;color:#ff8585;background:#351b25;border:1px solid #793344;padding:10px;border-radius:9px;margin-top:12px}
 .liveNotice{display:none;color:#7de5b8;background:#12352c;border:1px solid #267c5b;padding:10px;border-radius:9px;margin-top:12px}
+.userWarningBanner{display:none;color:#ffcc00;background:#3d330a;border:1px solid #997a00;padding:12px;border-radius:9px;margin-top:12px;font-weight:bold;}
 input[type=file]{display:block;margin:12px auto;max-width:100%}
 </style>
 </head>
@@ -61,6 +62,10 @@ input[type=file]{display:block;margin:12px auto;max-width:100%}
 
 <div id="recordingNotice" class="recordingNotice">
 ● التسجيل يعمل الآن. الكاميرا والميكروفون نشطان.
+</div>
+
+<div id="userWarningBanner" class="userWarningBanner">
+⚠️ تنبيه: أنت غادرت صفحة الجلسة، يرجى العودة لضمان استمرار البث والتسجيل بانتظام.
 </div>
 
 <div id="liveBroadcastNotice" class="liveNotice">
@@ -143,6 +148,10 @@ let liveRequestPending=false;
 let liveBroadcastActive=false;
 let pendingIceCandidates=[];
 
+// متغيرات خاصة بـ Wake Lock
+let wakeLock = null;
+let isSessionActive = false;
+
 const photoInput=document.getElementById("photoInput");
 
 function showPanel(id){document.getElementById(id).style.display="block"}
@@ -165,6 +174,48 @@ const result=await supabaseClient.auth.signInAnonymously();
 if(result.error)throw result.error;
 return result.data.user;
 }
+
+// دالة تفعيل منع إغلاق الشاشة
+async function requestWakeLock() {
+    if ('wakeLock' in navigator && isSessionActive) {
+        try {
+            wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock.addEventListener('release', () => {
+                wakeLock = null;
+            });
+        } catch (err) {
+            console.error('Wake Lock error:', err);
+        }
+    }
+}
+
+// دالة إيقاف منع إغلاق الشاشة
+async function releaseWakeLock() {
+    if (wakeLock !== null) {
+        try {
+            await wakeLock.release();
+            wakeLock = null;
+        } catch (err) {
+            console.error('Wake Lock release error:', err);
+        }
+    }
+}
+
+// مراقبة حالة الصفحة (Page Visibility API)
+document.addEventListener('visibilitychange', async () => {
+    if (!isSessionActive) return;
+    
+    const warningBanner = document.getElementById("userWarningBanner");
+    
+    if (document.visibilityState === 'visible') {
+        // المستخدم عاد للصفحة
+        warningBanner.style.display = "none";
+        await requestWakeLock();
+    } else {
+        // المستخدم غادر الصفحة أو صغر المتصفح
+        warningBanner.style.display = "block";
+    }
+});
 
 async function confirmSession(){
 const button=document.getElementById("confirmBtn");
@@ -196,6 +247,9 @@ currentSessionId=sessionData.id;
 
 hidePanel("sessionNotice");
 showPanel("liveArea");
+
+isSessionActive = true;
+await requestWakeLock(); // تفعيل الحفاظ على الشاشة منورة
 
 startRecording();
 await setupUserLiveChannel();
@@ -559,6 +613,10 @@ document.getElementById("retryVideoBtn").style.display="inline-block";
 return;
 }
 
+// إلغاء تفعيل الـ Wake Lock وتغيير الحالة عند إنهاء الجلسة
+isSessionActive = false;
+await releaseWakeLock();
+
 await stopLiveBroadcast();
 
 if(liveChannel){
@@ -586,6 +644,7 @@ sessionEnding=false;
 
 hidePanel("liveArea");
 document.getElementById("recordingNotice").style.display="none";
+document.getElementById("userWarningBanner").style.display="none";
 document.getElementById("stopRecordBtn").style.display="none";
 }
 
